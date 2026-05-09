@@ -1,0 +1,56 @@
+{
+  "name": "zk-project",
+  "version": "1.0.0",
+  "description": "ZK-based compliance layer using Node.js, TypeScript, Express, circom, and snarkjs.",
+  "main": "dist/api/app.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "ts-node-dev --respawn --transpile-only src/api/app.ts",
+    "start": "node dist/api/app.js",
+    "test": "jest --runInBand",
+    "compile:circuit": "bash scripts/compile_circuit.sh"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "circo": "^0.3.0",
+    "circomlib": "^2.0.5",
+    "circomlibjs": "^0.1.7",
+    "dotenv": "^16.4.5",
+    "express": "^5.2.1",
+    "express-rate-limit": "^7.4.1",
+    "ioredis": "^5.3.2",
+    "snarkjs": "^0.7.6",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.7.4",
+    "@types/snarkjs": "^0.7.9",
+    "@types/supertest": "^6.0.2",
+    "circom2": "^0.2.22",
+    "ioredis-mock": "^8.9.0",
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.4.9",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.6.2"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "roots": [
+      "<rootDir>/tests"
+    ],
+    "moduleNameMapper": {
+      "^@zk/(.*)$": "<rootDir>/src/zk/$1",
+      "^@services/(.*)$": "<rootDir>/src/services/$1",
+      "^@api/(.*)$": "<rootDir>/src/api/$1"
+    }
+  }
+}

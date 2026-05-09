@@ -1,0 +1,87 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+.pnp
+.pnp.js
+
+# Build output
+dist/
+build/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Testing
+coverage/
+.nyc_output/
+*.lcov
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# TypeScript
+*.tsbuildinfo
+
+# Circuit compilation artifacts (keep source .circom, ignore intermediate files)
+*.r1cs
+*.sym
+*.wtns
+
+# Powers of Tau ceremony files (large, can be regenerated)
+pot*.ptau
+
+# Proof/witness files (generated during testing)
+proof.json
+public.json
+witness*.wtns
+*_proof*.json
+*_public*.json
+input*.json
+verify_payload.json
+compliance_payload.json
+
+# Test output files
+r1cs_full_output.txt
+test_verify*.js
+verify_types.js
+run_tests.js
+
+# Client-side build output (if using bundler)
+public/js/bundle.js
+public/js/bundle.js.map
+public/dist/
+
+# Redis dump files
+dump.rdb
+
+# Documentation build output
+docs/build/
+
+# Graphify environment
+.graphify-env/

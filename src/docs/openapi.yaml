@@ -1,0 +1,585 @@
+openapi: 3.0.3
+info:
+  title: ZK Compliance API
+  version: 1.0.0
+  description: |
+    Zero-knowledge proof verification API. Callers learn only whether a compliance claim is valid.
+    No personal data is transmitted, logged, or stored.
+    Each proof is single-use — replay attempts are rejected.
+  contact:
+    name: API Support
+  license:
+    name: ISC
+
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+
+security:
+  - ApiKeyAuth: []
+
+tags:
+  - name: Proof Generation
+    description: Generate zero-knowledge proofs for compliance rules
+  - name: Verification
+    description: Verify zero-knowledge proofs
+  - name: Compliance
+    description: Check compliance and manage nullifier registry
+  - name: Health
+    description: Service health checks
+
+paths:
+  /proof/generate:
+    post:
+      tags:
+        - Proof Generation
+      summary: Generate a zero-knowledge proof
+      description: |
+        Generates a cryptographic proof for a compliance rule using private inputs.
+        
+        **Privacy Guarantee**: Private inputs are used only for proof generation and are never logged, stored, or returned. Only the cryptographic proof is returned.
+        
+        **Rate Limiting**: This endpoint has a stricter rate limit of 10 requests per minute per IP address due to the CPU-intensive nature of proof generation.
+        
+        **Supported Rules**:
+        - `age_18`: Prove age >= threshold without revealing actual age
+        - `income_threshold`: Prove income >= threshold without revealing actual income
+        - `sanctions_clear`: Prove identity is in whitelist without revealing which identity
+      operationId: generateProof
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ruleId
+                - privateInputs
+              properties:
+                ruleId:
+                  type: string
+                  enum:
+                    - age_18
+                    - income_threshold
+                    - sanctions_clear
+                  description: The compliance rule identifier
+                  example: income_threshold
+                privateInputs:
+                  type: object
+                  additionalProperties: true
+                  description: |
+                    Private inputs required by the circuit. The shape depends on the ruleId:
+                    
+                    - **age_18**: `{ age: string, threshold: string }`
+                    - **income_threshold**: `{ income: string, blinding_factor: string, threshold: string, commitment: string }`
+                    - **sanctions_clear**: `{ identity_secret: string, pathElements: string[], pathIndices: number[], root: string, identityCommitment: string }`
+                  example:
+                    income: "7500000"
+                    blinding_factor: "123456789"
+                    threshold: "5000000"
+                    commitment: "12345678901234567890"
+            examples:
+              age_18:
+                summary: Age verification proof
+                value:
+                  ruleId: age_18
+                  privateInputs:
+                    age: "25"
+                    threshold: "18"
+              income_threshold:
+                summary: Income threshold proof
+                value:
+                  ruleId: income_threshold
+                  privateInputs:
+                    income: "7500000"
+                    blinding_factor: "987654321098765432109876543210"
+                    threshold: "5000000"
+                    commitment: "12345678901234567890123456789012345678901234567890"
+              sanctions_clear:
+                summary: Sanctions clearance proof
+                value:
+                  ruleId: sanctions_clear
+                  privateInputs:
+                    identity_secret: "12345678901234567890123456789012345678901234567890"
+                    pathElements: ["0", "0", "0", "0", "0", "0", "0", "0", "0", "0"]
+                    pathIndices: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                    root: "12345678901234567890123456789012345678901234567890"
+                    identityCommitment: "98765432109876543210987654321098765432109876543210"
+      responses:
+        '200':
+          description: Proof generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - proof
+                  - publicSignals
+                properties:
+                  proof:
+                    type: object
+                    required:
+                      - pi_a
+                      - pi_b
+                      - pi_c
+                      - protocol
+                      - curve
+                    properties:
+                      pi_a:
+                        type: array
+                        items:
+                          type: string
+                        minItems: 3
+                        maxItems: 3
+                        description: First component of the Groth16 proof
+                      pi_b:
+                        type: array
+                        items:
+                          type: array
+                          items:
+                            type: string
+                          minItems: 2
+                          maxItems: 2
+                        minItems: 3
+                        maxItems: 3
+                        description: Second component of the Groth16 proof
+                      pi_c:
+                        type: array
+                        items:
+                          type: string
+                        minItems: 3
+                        maxItems: 3
+                        description: Third component of the Groth16 proof
+                      protocol:
+                        type: string
+                        enum:
+                          - groth16
+                        description: The zero-knowledge proof protocol used
+                      curve:
+                        type: string
+                        enum:
+                          - bn128
+                        description: The elliptic curve used
+                  publicSignals:
+                    type: array
+                    items:
+                      type: string
+                    description: Public outputs from the circuit (visible to verifier)
+              example:
+                proof:
+                  pi_a:
+                    - "12345678901234567890123456789012345678901234567890123456789012345678901234567890"
+                    - "98765432109876543210987654321098765432109876543210987654321098765432109876543210"
+                    - "1"
+                  pi_b:
+                    - ["11111111111111111111111111111111111111111111111111111111111111111111111111111111", "22222222222222222222222222222222222222222222222222222222222222222222222222222222"]
+                    - ["33333333333333333333333333333333333333333333333333333333333333333333333333333333", "44444444444444444444444444444444444444444444444444444444444444444444444444444444"]
+                    - ["55555555555555555555555555555555555555555555555555555555555555555555555555555555", "66666666666666666666666666666666666666666666666666666666666666666666666666666666"]
+                  pi_c:
+                    - "77777777777777777777777777777777777777777777777777777777777777777777777777777777"
+                    - "88888888888888888888888888888888888888888888888888888888888888888888888888888888"
+                    - "1"
+                  protocol: groth16
+                  curve: bn128
+                publicSignals:
+                  - "5000000"
+                  - "12345678901234567890123456789012345678901234567890"
+        '400':
+          description: Invalid request (bad ruleId or missing fields)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalidRuleId:
+                  summary: Invalid ruleId
+                  value:
+                    error: "Invalid request body."
+                    details:
+                      fieldErrors:
+                        ruleId: ["Invalid enum value. Expected 'age_18' | 'income_threshold' | 'sanctions_clear'"]
+                missingFields:
+                  summary: Missing required fields
+                  value:
+                    error: "Invalid request body."
+                    details:
+                      fieldErrors:
+                        privateInputs: ["Required"]
+        '401':
+          description: Unauthorized (missing or invalid API key)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Unauthorized."
+        '429':
+          description: Rate limit exceeded (10 requests per minute)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Too many proof generation requests. Please try again later."
+        '500':
+          description: Proof generation failed (witness generation error or internal error)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                witnessGenerationFailed:
+                  summary: Witness generation failed (constraint violation)
+                  value:
+                    error: "Proof generation failed."
+                    message: "Error: Assert Failed."
+                internalError:
+                  summary: Internal server error
+                  value:
+                    error: "Proof generation failed."
+                    message: "Unknown error"
+
+  /verify:
+    post:
+      tags:
+        - Verification
+      summary: Verify a zero-knowledge proof
+      description: |
+        Verifies the cryptographic validity of a proof using the default age_18 rule.
+        
+        **Note**: This endpoint only checks cryptographic validity. It does NOT check for replay attacks.
+        Use `/compliance/check` for production compliance checks with replay prevention.
+      operationId: verifyProof
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - proof
+                - publicSignals
+              properties:
+                proof:
+                  type: object
+                  additionalProperties: true
+                  description: The Groth16 proof object
+                publicSignals:
+                  type: array
+                  items:
+                    oneOf:
+                      - type: string
+                      - type: number
+                  description: Public signals from the proof
+            example:
+              proof:
+                pi_a: ["123", "456", "1"]
+                pi_b: [["1", "2"], ["3", "4"], ["5", "6"]]
+                pi_c: ["789", "012", "1"]
+                protocol: groth16
+                curve: bn128
+              publicSignals: ["18"]
+      responses:
+        '200':
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - verified
+                properties:
+                  verified:
+                    type: boolean
+                    description: True if proof is cryptographically valid, false otherwise
+              examples:
+                valid:
+                  summary: Valid proof
+                  value:
+                    verified: true
+                invalid:
+                  summary: Invalid proof
+                  value:
+                    verified: false
+        '400':
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Verification failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /compliance/check:
+    post:
+      tags:
+        - Compliance
+      summary: Check compliance with replay prevention
+      description: |
+        Verifies a proof and checks compliance with a specific rule.
+        
+        **Replay Prevention**: Each proof can only be used once per rule. The system computes a nullifier from the proof and stores it after successful verification. Subsequent attempts to use the same proof will be rejected with a 500 error.
+        
+        **Important**: A 500 response with message "Proof already used" indicates a replay attempt, not a server error. This is the correct behavior for detecting abuse.
+      operationId: checkCompliance
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ruleId
+                - proof
+                - publicSignals
+              properties:
+                ruleId:
+                  type: string
+                  description: The compliance rule identifier
+                  example: income_threshold
+                proof:
+                  type: object
+                  additionalProperties: true
+                  description: The Groth16 proof object
+                publicSignals:
+                  type: array
+                  items:
+                    oneOf:
+                      - type: string
+                      - type: number
+                  description: Public signals from the proof
+            example:
+              ruleId: income_threshold
+              proof:
+                pi_a: ["123", "456", "1"]
+                pi_b: [["1", "2"], ["3", "4"], ["5", "6"]]
+                pi_c: ["789", "012", "1"]
+                protocol: groth16
+                curve: bn128
+              publicSignals: ["5000000", "12345678901234567890"]
+      responses:
+        '200':
+          description: Compliance check result
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - compliant
+                properties:
+                  compliant:
+                    type: boolean
+                    description: True if proof is valid and compliant, false if cryptographically invalid
+              examples:
+                compliant:
+                  summary: Compliant (valid proof)
+                  value:
+                    compliant: true
+                notCompliant:
+                  summary: Not compliant (invalid proof)
+                  value:
+                    compliant: false
+        '400':
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Compliance check failed or replay attempt detected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                replayAttempt:
+                  summary: Replay attempt (proof already used)
+                  value:
+                    error: "Compliance evaluation failed."
+                    message: "Proof already used"
+                unknownRule:
+                  summary: Unknown ruleId
+                  value:
+                    error: "Compliance evaluation failed."
+                    message: "Unknown ruleId: nonexistent"
+
+  /compliance/nullifier/{hash}:
+    get:
+      tags:
+        - Compliance
+      summary: Check if a nullifier has been used
+      description: |
+        Checks if a specific nullifier hash has been registered in the system.
+        
+        Useful for clients to check before submitting a proof to avoid replay rejection.
+        
+        **Nullifier Format**: 64-character hexadecimal string (SHA256 hash)
+      operationId: checkNullifier
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: hash
+          in: path
+          required: true
+          description: The nullifier hash (64-character hex string)
+          schema:
+            type: string
+            pattern: '^[a-f0-9]{64}$'
+          example: "a1b2c3d4e5f6789012345678901234567890123456789012345678901234567890"
+      responses:
+        '200':
+          description: Nullifier check result
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - used
+                properties:
+                  used:
+                    type: boolean
+                    description: True if nullifier has been used, false otherwise
+              examples:
+                used:
+                  summary: Nullifier already used
+                  value:
+                    used: true
+                notUsed:
+                  summary: Nullifier not used
+                  value:
+                    used: false
+        '400':
+          description: Invalid nullifier hash format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Invalid nullifier hash format. Expected 64-character hex string."
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Failed to check nullifier
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /compliance/nullifier/count:
+    get:
+      tags:
+        - Compliance
+      summary: Get total count of registered nullifiers
+      description: |
+        Returns the total number of nullifiers registered in the system.
+        
+        Useful for monitoring, metrics, and capacity planning.
+      operationId: getNullifierCount
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Nullifier count
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - count
+                properties:
+                  count:
+                    type: integer
+                    minimum: 0
+                    description: Total number of registered nullifiers
+              example:
+                count: 42
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Failed to get nullifier count
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check endpoint
+      description: Returns the health status of the API service
+      operationId: healthCheck
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                properties:
+                  ok:
+                    type: boolean
+                    description: Always true when service is running
+              example:
+                ok: true
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: API key for authentication. Required for all endpoints.
+
+  schemas:
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Human-readable error message
+        message:
+          type: string
+          description: Additional error details (optional)
+        details:
+          type: object
+          description: Structured error details (optional, used for validation errors)
+      example:
+        error: "Invalid request body."
+        message: "Validation failed"
