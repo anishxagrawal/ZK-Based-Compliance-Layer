@@ -77,6 +77,9 @@ public/js/bundle.js
 public/js/bundle.js.map
 public/dist/
 
+# Client-side assets (keep out of repo)
+public/js/
+
 # Redis dump files
 dump.rdb
 
