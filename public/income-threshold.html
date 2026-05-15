@@ -2,85 +2,517 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Income Threshold - ZK Proof</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Income Threshold - ZK Compliance</title>
   <script src="https://cdn.jsdelivr.net/npm/snarkjs@0.7.4/build/snarkjs.min.js"></script>
   <script src="/zk-client.js"></script>
-  <script type="module">
-    import { buildPoseidon } from "https://esm.sh/circomlibjs@0.1.7";
-    window._poseidonReady = buildPoseidon().then((p) => { window._poseidon = p; });
+  <script src="/js/circomlibjs.bundle.js"></script>
+  <script>
+    window._poseidonReady = circomlibjs.buildPoseidon().then((p) => {
+      window._poseidon = p;
+    });
   </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0a0a0f;
+      --surface:   #111118;
+      --border:    #1e1e2e;
+      --accent:    #00ff88;
+      --accent-dim:#00cc6a;
+      --text:      #e2e2e8;
+      --muted:     #6b6b80;
+      --red:       #ff4466;
+      --yellow:    #ffcc00;
+      --blue:      #4488ff;
+      --radius:    6px;
+      --mono:      'Courier New', Courier, monospace;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 14px;
+      line-height: 1.7;
+      min-height: 100vh;
+    }
+
+    .page {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+
+    /* Back link */
+    .back {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 12px;
+      margin-bottom: 32px;
+      transition: color 0.15s;
+    }
+    .back:hover { color: var(--text); }
+
+    /* Header */
+    .header { margin-bottom: 40px; animation: fadeUp 0.4s ease both; }
+    .circuit-tag {
+      font-size: 11px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+    .header h1 {
+      font-size: clamp(22px, 4vw, 36px);
+      font-weight: normal;
+      color: #fff;
+      margin-bottom: 12px;
+      letter-spacing: -0.5px;
+    }
+    .header p {
+      color: var(--muted);
+      font-size: 13px;
+      max-width: 520px;
+    }
+
+    /* Input badges */
+    .badge-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+    .badge {
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 11px;
+      letter-spacing: 0.5px;
+    }
+    .badge.private {
+      background: rgba(255,68,102,0.12);
+      color: var(--red);
+      border: 1px solid rgba(255,68,102,0.3);
+    }
+    .badge.public {
+      background: rgba(68,136,255,0.12);
+      color: var(--blue);
+      border: 1px solid rgba(68,136,255,0.3);
+    }
+
+    /* Progress steps */
+    .progress {
+      display: flex;
+      gap: 0;
+      margin-bottom: 40px;
+      animation: fadeUp 0.4s ease 0.1s both;
+    }
+    .progress-step {
+      flex: 1;
+      padding: 10px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+      letter-spacing: 0.5px;
+      transition: all 0.2s;
+      cursor: default;
+    }
+    .progress-step:not(:last-child) { border-right: none; }
+    .progress-step:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+    .progress-step:last-child  { border-radius: 0 var(--radius) var(--radius) 0; }
+    .progress-step.active {
+      background: rgba(0,255,136,0.08);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .progress-step.done {
+      color: var(--accent-dim);
+      border-color: var(--accent-dim);
+    }
+
+    /* Step panels */
+    .step {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 16px;
+      animation: fadeUp 0.4s ease 0.2s both;
+    }
+    .step-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .step-num {
+      width: 28px;
+      height: 28px;
+      border: 1px solid var(--accent);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+    .step-title {
+      font-size: 14px;
+      color: #fff;
+    }
+    .step-desc {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+
+    /* Labels and inputs */
+    .field { margin-bottom: 16px; }
+    .field-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .field-label .badge { font-size: 10px; padding: 1px 6px; }
+
+    input[type="text"],
+    input[type="number"] {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+      padding: 10px 12px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input[type="text"]:focus,
+    input[type="number"]:focus { border-color: var(--accent); }
+    input[readonly] {
+      color: var(--muted);
+      cursor: default;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      background: transparent;
+      border: 1px solid var(--accent);
+      border-radius: var(--radius);
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      letter-spacing: 0.5px;
+    }
+    .btn:hover {
+      background: var(--accent);
+      color: var(--bg);
+    }
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .btn.secondary {
+      border-color: var(--border);
+      color: var(--muted);
+    }
+    .btn.secondary:hover {
+      border-color: var(--muted);
+      background: transparent;
+      color: var(--text);
+    }
+
+    /* Status message */
+    .status-msg {
+      margin-top: 16px;
+      font-size: 13px;
+      min-height: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .status-msg.loading { color: var(--yellow); }
+    .status-msg.success { color: var(--accent); }
+    .status-msg.error   { color: var(--red); }
+
+    /* Spinner */
+    .spinner {
+      width: 12px;
+      height: 12px;
+      border: 2px solid var(--border);
+      border-top-color: var(--yellow);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+
+    /* Result pre block */
+    .result-block {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-top: 16px;
+      font-size: 12px;
+      color: var(--muted);
+      max-height: 320px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      display: none;
+    }
+    .result-block.visible { display: block; }
+    .result-block.compliant { border-color: var(--accent); color: var(--text); }
+    .result-block.rejected  { border-color: var(--red); }
+
+    /* Note box */
+    .note {
+      background: rgba(0,255,136,0.04);
+      border: 1px solid rgba(0,255,136,0.15);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+    .note strong { color: var(--accent); }
+
+    /* Divider */
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 32px 0;
+    }
+
+    /* Animations */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
 </head>
 <body>
-  <h1>Income Threshold</h1>
-  <p>Proves your income is above a threshold without revealing it.</p>
+<div class="page">
 
-  <h2>Step 1 - Compute your commitment (do this once)</h2>
-  <label>Your income (private):</label><br />
-  <input id="income" type="number" value="60000" /><br /><br />
-  <label>Blinding factor (private - pick any large random number):</label><br />
-  <input id="blind" type="number" value="987654321" /><br /><br />
-  <button onclick="computeCommitment()">Compute Commitment</button>
-  <p>Your commitment (public - share this with the server):</p>
-  <input id="commitment-display" readonly style="width: 100%" />
+  <a class="back" href="index.html"><- Back to circuits</a>
 
-  <h2>Step 2 - Generate and submit proof</h2>
-  <label>Threshold (public - what the server requires):</label><br />
-  <input id="threshold" type="number" value="50000" /><br /><br />
-  <label>Commitment (paste from Step 1 or from server):</label><br />
-  <input id="commitment" style="width: 100%" /><br /><br />
-  <button onclick="run()">Prove &amp; Submit</button>
+  <header class="header">
+    <div class="circuit-tag">Circuit 02 - Income Threshold</div>
+    <h1>Prove your income.<br/>Without revealing it.</h1>
+    <p>
+      Uses a Poseidon commitment to bind the proof to your specific income
+      without revealing the value. The circuit verifies
+      <code>income >= threshold</code> and <code>Poseidon(income, blinding) = commitment</code>.
+    </p>
+    <div class="badge-row">
+      <span class="badge private">private: income</span>
+      <span class="badge private">private: blinding_factor</span>
+      <span class="badge public">public: threshold</span>
+      <span class="badge public">public: commitment</span>
+    </div>
+  </header>
 
-  <p id="status"></p>
-  <pre id="result"></pre>
+  <div class="progress" id="progress">
+    <div class="progress-step active" id="prog-1">1 - Commitment</div>
+    <div class="progress-step" id="prog-2">2 - Proving</div>
+    <div class="progress-step" id="prog-3">3 - Result</div>
+  </div>
 
-  <script>
-    async function computeCommitment() {
-      await window._poseidonReady;
-      const income = document.getElementById("income").value;
-      const blind = document.getElementById("blind").value;
-      const hash = window._poseidon([BigInt(income), BigInt(blind)]);
-      const str = window._poseidon.F.toString(hash);
-      document.getElementById("commitment-display").value = str;
-      document.getElementById("commitment").value = str;
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">1</div>
+      <div class="step-title">Compute your commitment</div>
+    </div>
+    <p class="step-desc">
+      The commitment is <code>Poseidon(income, blinding_factor)</code> - a hash
+      that proves you know a specific income without revealing it.
+      Compute it once and share it with the server during onboarding.
+    </p>
+
+    <div class="field">
+      <div class="field-label">
+        <span class="badge private">private</span>
+        Your income
+      </div>
+      <input type="number" id="income" value="60000" />
+    </div>
+
+    <div class="field">
+      <div class="field-label">
+        <span class="badge private">private</span>
+        Blinding factor (any large random number)
+      </div>
+      <input type="number" id="blind" value="987654321" />
+    </div>
+
+    <button class="btn secondary" onclick="computeCommitment()">
+      Compute Commitment
+    </button>
+
+    <div class="field" style="margin-top: 16px;">
+      <div class="field-label">
+        <span class="badge public">public</span>
+        Your commitment - Poseidon(income, blinding_factor)
+      </div>
+      <input type="text" id="commitment-display" readonly
+             placeholder="Click Compute Commitment above" />
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">2</div>
+      <div class="step-title">Generate and submit proof</div>
+    </div>
+    <p class="step-desc">
+      The proof verifies your income meets the threshold and matches
+      your commitment. Your actual income never leaves the browser.
+    </p>
+
+    <div class="note">
+      <strong>How it works:</strong> snarkjs runs the circuit locally with your
+      private income and blinding factor. The server only receives the proof
+      and public signals - threshold and commitment.
+    </div>
+
+    <div class="field">
+      <div class="field-label">
+        <span class="badge public">public</span>
+        Minimum income threshold
+      </div>
+      <input type="number" id="threshold" value="50000" />
+    </div>
+
+    <div class="field">
+      <div class="field-label">
+        <span class="badge public">public</span>
+        Commitment (auto-filled from Step 1)
+      </div>
+      <input type="text" id="commitment" placeholder="Complete Step 1 first" />
+    </div>
+
+    <button class="btn" id="prove-btn" onclick="run()">
+      Generate &amp; Submit Proof
+    </button>
+
+    <div class="status-msg" id="status"></div>
+  </div>
+
+  <pre class="result-block" id="result"></pre>
+
+</div>
+
+<script>
+  function setProgress(step) {
+    for (let i = 1; i <= 3; i++) {
+      const el = document.getElementById("prog-" + i);
+      el.className = "progress-step" +
+        (i < step ? " done" : i === step ? " active" : "");
+    }
+  }
+
+  function setStatus(msg, type) {
+    const el = document.getElementById("status");
+    el.className = "status-msg " + (type || "");
+    if (type === "loading") {
+      el.innerHTML = '<div class="spinner"></div>' + msg;
+    } else {
+      el.textContent = msg;
+    }
+  }
+
+  async function computeCommitment() {
+    await window._poseidonReady;
+    const income = document.getElementById("income").value;
+    const blind = document.getElementById("blind").value;
+    const hash = window._poseidon([BigInt(income), BigInt(blind)]);
+    const str = window._poseidon.F.toString(hash);
+    document.getElementById("commitment-display").value = str;
+    document.getElementById("commitment").value = str;
+    setProgress(2);
+  }
+
+  async function run() {
+    if (!window.snarkjs) {
+      setStatus("snarkjs still loading - wait a moment and retry.", "error");
+      return;
     }
 
-    async function run() {
-      if (!window.snarkjs) {
-        document.getElementById("status").textContent =
-          "Error: ZK library still loading, please wait a moment and try again.";
-        return;
-      }
-      const status = document.getElementById("status");
-      status.textContent = "Generating proof...";
-      try {
-        const allInputs = {
-          income: document.getElementById("income").value,
-          blinding_factor: document.getElementById("blind").value,
-          threshold: document.getElementById("threshold").value,
-          commitment: document.getElementById("commitment").value
-        };
-
-        const { proof, publicSignals } = await window.zkClient.generateProof(
-          "income_threshold",
-          allInputs
-        );
-        status.textContent = "Submitting...";
-        const response = await window.zkClient.submitCompliance(
-          "income_threshold",
-          proof,
-          publicSignals
-        );
-        status.textContent = response.compliant ? "OK: Compliant" : "Not compliant";
-        document.getElementById("result").textContent = JSON.stringify(
-          { publicSignals, response },
-          null,
-          2
-        );
-      } catch (err) {
-        status.textContent = "Error: " + err.message;
-        console.error(err);
-      }
+    const commitment = document.getElementById("commitment").value;
+    if (!commitment) {
+      setStatus("Complete Step 1 first - compute your commitment.", "error");
+      return;
     }
-  </script>
+
+    const btn = document.getElementById("prove-btn");
+    const result = document.getElementById("result");
+    btn.disabled = true;
+    result.className = "result-block";
+
+    try {
+      setStatus("Generating proof locally (0.3-0.5s)...", "loading");
+
+      const allInputs = {
+        income: document.getElementById("income").value,
+        blinding_factor: document.getElementById("blind").value,
+        threshold: document.getElementById("threshold").value,
+        commitment
+      };
+
+      const { proof, publicSignals } = await window.zkClient.generateProof(
+        "income_threshold", allInputs
+      );
+
+      setStatus("Submitting proof to server...", "loading");
+
+      const response = await window.zkClient.submitCompliance(
+        "income_threshold", proof, publicSignals
+      );
+
+      setProgress(3);
+
+      if (response.compliant) {
+        setStatus("✓ Compliant - income >= threshold verified", "success");
+        result.className = "result-block visible compliant";
+      } else {
+        setStatus("✗ Not compliant", "error");
+        result.className = "result-block visible rejected";
+      }
+
+      result.textContent = JSON.stringify({
+        note: "income and blinding_factor are NOT in this payload",
+        publicSignals,
+        response
+      }, null, 2);
+
+    } catch (err) {
+      setStatus("Error: " + err.message, "error");
+      console.error(err);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+</script>
 </body>
 </html>

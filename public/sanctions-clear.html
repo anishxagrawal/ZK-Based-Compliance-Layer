@@ -2,123 +2,492 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Sanctions Clear - ZK Proof</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sanctions Clear - ZK Compliance</title>
   <script src="https://cdn.jsdelivr.net/npm/snarkjs@0.7.4/build/snarkjs.min.js"></script>
   <script src="/zk-client.js"></script>
   <script src="/js/circomlibjs.bundle.js"></script>
   <script>
-  window._poseidonReady = circomlibjs.buildPoseidon().then((p) => {
-    window._poseidon = p;
-    console.log("[sanctions] Poseidon hasher ready");
-  });
+    window._poseidonReady = circomlibjs.buildPoseidon().then((p) => {
+      window._poseidon = p;
+      console.log("[sanctions] Poseidon hasher ready");
+    });
   </script>
   <style>
-    body { font-family: monospace; max-width: 680px; margin: 40px auto; padding: 0 16px; }
-    h2 { margin-top: 2rem; border-top: 1px solid #ddd; padding-top: 1rem; }
-    label { display: block; margin: 8px 0 4px; font-weight: bold; }
-    input { width: 100%; padding: 6px; box-sizing: border-box; font-family: monospace; }
-    button { margin-top: 8px; padding: 8px 20px; cursor: pointer; font-size: 14px; }
-    pre { background: #f4f4f4; padding: 12px; overflow-x: auto; white-space: pre-wrap; font-size: 12px; }
-    .ok { color: green; font-weight: bold; font-size: 18px; }
-    .fail { color: red; font-weight: bold; font-size: 18px; }
-    .info { color: #555; font-size: 13px; margin: 4px 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0a0a0f;
+      --surface:   #111118;
+      --border:    #1e1e2e;
+      --accent:    #00ff88;
+      --accent-dim:#00cc6a;
+      --text:      #e2e2e8;
+      --muted:     #6b6b80;
+      --red:       #ff4466;
+      --yellow:    #ffcc00;
+      --blue:      #4488ff;
+      --radius:    6px;
+      --mono:      'Courier New', Courier, monospace;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 14px;
+      line-height: 1.7;
+      min-height: 100vh;
+    }
+
+    .page {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+
+    /* Back link */
+    .back {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 12px;
+      margin-bottom: 32px;
+      transition: color 0.15s;
+    }
+    .back:hover { color: var(--text); }
+
+    /* Header */
+    .header { margin-bottom: 40px; animation: fadeUp 0.4s ease both; }
+    .circuit-tag {
+      font-size: 11px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+    .header h1 {
+      font-size: clamp(22px, 4vw, 36px);
+      font-weight: normal;
+      color: #fff;
+      margin-bottom: 12px;
+      letter-spacing: -0.5px;
+    }
+    .header p {
+      color: var(--muted);
+      font-size: 13px;
+      max-width: 520px;
+    }
+
+    /* Input badges */
+    .badge-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+    .badge {
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 11px;
+      letter-spacing: 0.5px;
+    }
+    .badge.private {
+      background: rgba(255,68,102,0.12);
+      color: var(--red);
+      border: 1px solid rgba(255,68,102,0.3);
+    }
+    .badge.public {
+      background: rgba(68,136,255,0.12);
+      color: var(--blue);
+      border: 1px solid rgba(68,136,255,0.3);
+    }
+
+    /* Progress steps */
+    .progress {
+      display: flex;
+      gap: 0;
+      margin-bottom: 40px;
+      animation: fadeUp 0.4s ease 0.1s both;
+    }
+    .progress-step {
+      flex: 1;
+      padding: 10px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+      letter-spacing: 0.5px;
+      transition: all 0.2s;
+      cursor: default;
+    }
+    .progress-step:not(:last-child) { border-right: none; }
+    .progress-step:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+    .progress-step:last-child  { border-radius: 0 var(--radius) var(--radius) 0; }
+    .progress-step.active {
+      background: rgba(0,255,136,0.08);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .progress-step.done {
+      color: var(--accent-dim);
+      border-color: var(--accent-dim);
+    }
+
+    /* Step panels */
+    .step {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 16px;
+      animation: fadeUp 0.4s ease 0.2s both;
+    }
+    .step-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .step-num {
+      width: 28px;
+      height: 28px;
+      border: 1px solid var(--accent);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+    .step-title {
+      font-size: 14px;
+      color: #fff;
+    }
+    .step-desc {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+
+    /* Labels and inputs */
+    .field { margin-bottom: 16px; }
+    .field-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .field-label .badge { font-size: 10px; padding: 1px 6px; }
+
+    input[type="text"],
+    input[type="number"] {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+      padding: 10px 12px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input[type="text"]:focus,
+    input[type="number"]:focus { border-color: var(--accent); }
+    input[readonly] {
+      color: var(--muted);
+      cursor: default;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      background: transparent;
+      border: 1px solid var(--accent);
+      border-radius: var(--radius);
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      letter-spacing: 0.5px;
+    }
+    .btn:hover {
+      background: var(--accent);
+      color: var(--bg);
+    }
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .btn.secondary {
+      border-color: var(--border);
+      color: var(--muted);
+    }
+    .btn.secondary:hover {
+      border-color: var(--muted);
+      background: transparent;
+      color: var(--text);
+    }
+
+    /* Status message */
+    .status-msg {
+      margin-top: 16px;
+      font-size: 13px;
+      min-height: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .status-msg.loading { color: var(--yellow); }
+    .status-msg.success { color: var(--accent); }
+    .status-msg.error   { color: var(--red); }
+
+    /* Spinner */
+    .spinner {
+      width: 12px;
+      height: 12px;
+      border: 2px solid var(--border);
+      border-top-color: var(--yellow);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+
+    /* Result pre block */
+    .result-block {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-top: 16px;
+      font-size: 12px;
+      color: var(--muted);
+      max-height: 320px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      display: none;
+    }
+    .result-block.visible { display: block; }
+    .result-block.compliant { border-color: var(--accent); color: var(--text); }
+    .result-block.rejected  { border-color: var(--red); }
+
+    /* Note box */
+    .note {
+      background: rgba(0,255,136,0.04);
+      border: 1px solid rgba(0,255,136,0.15);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+    .note strong { color: var(--accent); }
+
+    /* Divider */
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 32px 0;
+    }
+
+    /* Animations */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
+<div class="page">
 
-<!-- REGISTRATION SECTION -->
-<div id="registration-section" style="border: 1px solid #ccc; padding: 16px; margin-bottom: 32px; background: #f9f9f9;">
-  <h2 style="margin-top: 0; border: none;">Register Your Identity (New Users)</h2>
-  <p class="info">
-    Already registered? Skip this and go to Step 1 below.<br/>
-    Your identity_secret never leaves your browser -- only its hash is sent to the server.
-  </p>
+  <a class="back" href="index.html"><- Back to circuits</a>
 
-  <label>Identity Secret (private -- choose any number, remember it):</label>
-  <input id="reg-secret" type="text" placeholder="e.g. 9999999999" />
+  <header class="header">
+    <div class="circuit-tag">Circuit 03 - Sanctions Clear</div>
+    <h1>Prove whitelist membership.<br/>Without revealing your identity.</h1>
+    <p>
+      Uses a 10-level Poseidon Merkle tree. Proves your identity commitment
+      is a leaf in the approved tree without revealing which leaf or what your
+      secret is.
+    </p>
+    <div class="badge-row">
+      <span class="badge private">private: identity_secret</span>
+      <span class="badge private">private: pathElements[10]</span>
+      <span class="badge private">private: pathIndices[10]</span>
+      <span class="badge public">public: root</span>
+      <span class="badge public">public: identityCommitment</span>
+    </div>
+  </header>
 
-  <button onclick="registerIdentity()" style="margin-top: 8px;">Register Identity</button>
+  <div class="progress" id="progress">
+    <div class="progress-step active" id="prog-1">0 - Register</div>
+    <div class="progress-step" id="prog-2">1 - Commitment</div>
+    <div class="progress-step" id="prog-3">2 - Path</div>
+    <div class="progress-step" id="prog-4">3 - Proof</div>
+  </div>
 
-  <p id="reg-status" style="margin-top: 8px;"></p>
-  <pre id="reg-result" style="display:none; background:#eee; padding:8px; font-size:12px;"></pre>
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">0</div>
+      <div class="step-title">Register your identity (new users only)</div>
+    </div>
+    <p class="step-desc">
+      Already registered? Skip this step. Your secret never leaves the browser -
+      only its Poseidon hash is sent to the server.
+    </p>
+
+    <div class="field">
+      <div class="field-label">
+        <span class="badge private">private</span>
+        Identity secret (choose any number - remember it)
+      </div>
+      <input type="text" id="reg-secret" placeholder="e.g. 7777777777" />
+    </div>
+
+    <button class="btn secondary" id="reg-btn" onclick="registerIdentity()">
+      Register Identity
+    </button>
+
+    <div class="status-msg" id="reg-status"></div>
+    <pre class="result-block" id="reg-result"></pre>
+  </div>
+
+  <hr class="divider" />
+
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">1</div>
+      <div class="step-title">Compute your identity commitment</div>
+    </div>
+    <p class="step-desc">
+      Computes <code>Poseidon(identity_secret)</code> locally.
+      This commitment is what the server stores in the Merkle tree.
+    </p>
+
+    <div class="field">
+      <div class="field-label">
+        <span class="badge private">private</span>
+        Identity secret
+      </div>
+      <input type="text" id="secret" value="1234567890" />
+    </div>
+
+    <button class="btn secondary" onclick="computeCommitment()">
+      Compute Commitment
+    </button>
+
+    <div class="field" style="margin-top: 16px;">
+      <div class="field-label">
+        <span class="badge public">public</span>
+        Identity commitment - Poseidon(secret)
+      </div>
+      <input type="text" id="commitment-display" readonly
+             placeholder="Click Compute Commitment above" />
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">2</div>
+      <div class="step-title">Fetch your Merkle path</div>
+    </div>
+    <p class="step-desc">
+      The server looks up your commitment in the whitelist and returns
+      the 10 sibling hashes needed to reconstruct the root.
+      The server does not learn your secret.
+    </p>
+
+    <button class="btn secondary" id="path-btn" onclick="fetchPath()">
+      Fetch Path From Server
+    </button>
+
+    <div class="status-msg" id="path-status"></div>
+    <pre class="result-block" id="path-display"></pre>
+  </div>
+
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">3</div>
+      <div class="step-title">Generate proof and submit</div>
+    </div>
+    <p class="step-desc">
+      snarkjs generates the Groth16 proof locally using your secret and the
+      Merkle path. Only the proof and public signals are sent to the server.
+      Expect 1-3 seconds for proof generation.
+    </p>
+
+    <div class="note">
+      <strong>What the server receives:</strong> the Merkle root and your
+      identity commitment - not your secret, not which leaf you occupy,
+      not the path elements.
+    </div>
+
+    <button class="btn" id="prove-btn" onclick="runProof()">
+      Generate &amp; Submit Proof
+    </button>
+
+    <div class="status-msg" id="status"></div>
+  </div>
+
+  <pre class="result-block" id="result"></pre>
+
 </div>
-
-<h1>Sanctions Clear</h1>
-<p>
-  Proves your identity is on the approved whitelist without revealing
-  which identity you are or what your secret is.
-</p>
-
-<h2>Step 1 - Compute Your Identity Commitment</h2>
-<p class="info">
-  Your identity_secret stays in your browser. Only the commitment
-  (a hash of the secret) is sent to the server.
-</p>
-
-<label>Identity Secret (private - never leaves your browser):</label>
-<input id="secret" type="text" value="1234567890" />
-<p class="info">Use one of the test secrets from generate-test-identities.ts</p>
-
-<button onclick="computeCommitment()">Compute Commitment</button>
-
-<label style="margin-top:12px">Your Identity Commitment (public - Poseidon of your secret):</label>
-<input id="commitment-display" readonly />
-
-<h2>Step 2 - Fetch Your Merkle Path</h2>
-<p class="info">
-  The server looks up your commitment in its whitelist and returns
-  the sibling hashes needed to prove membership.
-  It does NOT learn your secret.
-</p>
-
-<button onclick="fetchPath()">Fetch Path From Server</button>
-
-<label style="margin-top:12px">Server Response:</label>
-<pre id="path-display">-</pre>
-
-<h2>Step 3 - Generate Proof and Submit</h2>
-<p class="info">
-  Proof is generated entirely in your browser using the secret and path.
-  Only the proof and public signals are sent to the server.
-</p>
-
-<button onclick="runProof()">Generate Proof &amp; Submit</button>
-
-<p id="status"></p>
-<pre id="result">-</pre>
 
 <script>
   let commitmentValue = null;
   let pathData = null;
 
-  /**
-   * Registration flow:
-   * 1. Compute commitment = Poseidon(secret) locally
-   * 2. POST { identityCommitment } to /sanctions/register
-   * 3. Display new root and success message
-   *
-   * The secret is used only in step 1 and never transmitted.
-   */
-  async function registerIdentity() {
-    const regStatus = document.getElementById("reg-status");
-    const regResult = document.getElementById("reg-result");
+  function setProgress(step) {
+    for (let i = 1; i <= 4; i++) {
+      const el = document.getElementById("prog-" + i);
+      el.className = "progress-step" +
+        (i < step ? " done" : i === step ? " active" : "");
+    }
+  }
 
+  function setStatus(id, msg, type) {
+    const el = document.getElementById(id);
+    el.className = "status-msg " + (type || "");
+    if (type === "loading") {
+      el.innerHTML = '<div class="spinner"></div>' + msg;
+    } else {
+      el.textContent = msg;
+    }
+  }
+
+  async function registerIdentity() {
     const secret = document.getElementById("reg-secret").value.trim();
     if (!secret) {
-      regStatus.textContent = "Please enter an identity secret.";
+      setStatus("reg-status", "Please enter an identity secret.", "error");
       return;
     }
 
-    regStatus.textContent = "Computing commitment locally...";
+    const btn = document.getElementById("reg-btn");
+    btn.disabled = true;
+    setStatus("reg-status", "Computing commitment locally...", "loading");
 
     try {
       await window._poseidonReady;
       const hash = window._poseidon([BigInt(secret)]);
       const commitment = window._poseidon.F.toString(hash);
 
-      console.log("[register] Commitment computed:", commitment);
-
-      regStatus.textContent = "Sending commitment to server...";
+      setStatus("reg-status", "Sending commitment to server...", "loading");
 
       const res = await fetch("/sanctions/register", {
         method: "POST",
@@ -132,100 +501,114 @@
       const data = await res.json();
 
       if (!res.ok) {
-        regStatus.textContent = "Registration failed: " + (data.message || data.error);
+        setStatus("reg-status",
+          "Registration failed: " + (data.message || data.error), "error");
         return;
       }
 
-      regStatus.textContent =
-        "Registered. You can now generate a proof. New tree root: " + data.root.slice(0, 20) + "...";
+      setStatus("reg-status",
+        "✓ Registered - new tree root: " + data.root.slice(0, 24) + "...",
+        "success");
 
-      regResult.style.display = "block";
+      const regResult = document.getElementById("reg-result");
+      regResult.className = "result-block visible compliant";
       regResult.textContent = JSON.stringify(data, null, 2);
 
-      const step1SecretField = document.getElementById("secret");
-      if (step1SecretField) {
-        step1SecretField.value = secret;
-      }
+      document.getElementById("secret").value = secret;
+      setProgress(2);
+
     } catch (err) {
-      regStatus.textContent = "Error: " + err.message;
-      console.error(err);
+      setStatus("reg-status", "Error: " + err.message, "error");
+    } finally {
+      btn.disabled = false;
     }
   }
 
   async function computeCommitment() {
+    const secret = document.getElementById("secret").value.trim();
+    if (!secret) {
+      setStatus("path-status", "Enter an identity secret first.", "error");
+      return;
+    }
+
     try {
       await window._poseidonReady;
-
-      const secret = document.getElementById("secret").value.trim();
-      if (!secret) {
-        alert("Please enter an identity secret.");
-        return;
-      }
-
       const hash = window._poseidon([BigInt(secret)]);
       const commitment = window._poseidon.F.toString(hash);
 
       commitmentValue = commitment;
       document.getElementById("commitment-display").value = commitment;
-      console.log("[sanctions] Commitment computed:", commitment);
+      setProgress(3);
+      console.log("[sanctions] Commitment:", commitment);
     } catch (err) {
-      alert("Error computing commitment: " + err.message);
-      console.error(err);
+      alert("Error: " + err.message);
     }
   }
 
   async function fetchPath() {
     if (!commitmentValue) {
-      alert("Compute your commitment first (Step 1).");
+      setStatus("path-status", "Compute your commitment first (Step 1).", "error");
       return;
     }
 
+    const btn = document.getElementById("path-btn");
+    btn.disabled = true;
+    setStatus("path-status", "Fetching Merkle path from server...", "loading");
+
     const display = document.getElementById("path-display");
-    display.textContent = "Fetching from server...";
 
     try {
-      const res = await fetch(`/sanctions/path/${commitmentValue}`, {
+      const res = await fetch("/sanctions/path/" + commitmentValue, {
         headers: { "x-api-key": window.zkClient._API_KEY }
       });
 
       if (res.status === 404) {
-        display.textContent = "ERROR: Identity not found in whitelist.\nMake sure you used a secret from generate-test-identities.ts and the commitments are hardcoded in MerkleTreeService.ts";
+        setStatus("path-status",
+          "Identity not found in whitelist. Register first using Step 0.", "error");
+        display.className = "result-block";
         return;
       }
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        display.textContent = "ERROR: " + (body.error || `HTTP ${res.status}`);
+        setStatus("path-status",
+          "Error: " + (body.error || "HTTP " + res.status), "error");
         return;
       }
 
       pathData = await res.json();
+      setStatus("path-status", "✓ Path received - ready to generate proof", "success");
+
+      display.className = "result-block visible";
       display.textContent = JSON.stringify(pathData, null, 2);
-      console.log("[sanctions] Path received:", pathData);
+
+      setProgress(4);
+
     } catch (err) {
-      display.textContent = "Network error: " + err.message;
-      console.error(err);
+      setStatus("path-status", "Network error: " + err.message, "error");
+    } finally {
+      btn.disabled = false;
     }
   }
 
   async function runProof() {
     if (!window.snarkjs) {
-      document.getElementById("status").textContent =
-        "Error: ZK library still loading, please wait a moment and try again.";
+      setStatus("status", "snarkjs still loading - wait and retry.", "error");
       return;
     }
-    const status = document.getElementById("status");
-    const result = document.getElementById("result");
-
     if (!commitmentValue || !pathData) {
-      alert("Complete Steps 1 and 2 first.");
+      setStatus("status", "Complete Steps 1 and 2 first.", "error");
       return;
     }
 
-    status.textContent = "Generating proof locally (this may take 1-3 seconds)...";
-    result.textContent = "";
+    const btn = document.getElementById("prove-btn");
+    const result = document.getElementById("result");
+    btn.disabled = true;
+    result.className = "result-block";
 
     try {
+      setStatus("status", "Generating proof locally (1-3 seconds)...", "loading");
+
       const secret = document.getElementById("secret").value.trim();
 
       const allInputs = {
@@ -237,39 +620,36 @@
       };
 
       const { proof, publicSignals } = await window.zkClient.generateProof(
-        "sanctions_clear",
-        allInputs
+        "sanctions_clear", allInputs
       );
 
-      status.textContent = "Submitting proof to server...";
+      setStatus("status", "Submitting proof to server...", "loading");
 
       const response = await window.zkClient.submitCompliance(
-        "sanctions_clear",
-        proof,
-        publicSignals
+        "sanctions_clear", proof, publicSignals
       );
 
-      status.className = response.compliant ? "ok" : "fail";
-      status.textContent = response.compliant
-        ? "OK: Compliant - Identity is on the whitelist"
-        : "Not compliant";
+      if (response.compliant) {
+        setStatus("status", "✓ Compliant - identity is on the whitelist", "success");
+        result.className = "result-block visible compliant";
+      } else {
+        setStatus("status", "✗ Not compliant", "error");
+        result.className = "result-block visible rejected";
+      }
 
-      result.textContent = JSON.stringify(
-        {
-          publicSignals,
-          note: "identity_secret is not in this payload",
-          response
-        },
-        null,
-        2
-      );
+      result.textContent = JSON.stringify({
+        note: "identity_secret is NOT in this payload",
+        publicSignals,
+        response
+      }, null, 2);
+
     } catch (err) {
-      status.className = "fail";
-      status.textContent = "Error: " + err.message;
+      setStatus("status", "Error: " + err.message, "error");
       console.error(err);
+    } finally {
+      btn.disabled = false;
     }
   }
 </script>
-
 </body>
 </html>
