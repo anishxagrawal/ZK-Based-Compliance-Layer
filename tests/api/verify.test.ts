@@ -20,7 +20,7 @@ describe("POST /verify", () => {
 
     const response = await request(app)
       .post("/verify")
-      .send({ proof: { pi_a: ["1", "2"] }, publicSignals: ["18"] });
+      .send({ ruleId: "age_18", proof: { pi_a: ["1", "2"] }, publicSignals: ["18"] });
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ verified: true });

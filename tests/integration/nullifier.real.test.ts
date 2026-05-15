@@ -178,15 +178,72 @@ describe("Nullifier Registry — Real ZK Replay Prevention", () => {
   });
 
   it("different ruleIds allow same proof to be used", async () => {
-    // This test verifies that nullifiers are rule-specific
-    // The same proof can be used for different rules
-    
-    // Use the sanctions_clear rule with a different proof
-    const sanctionsProofPath = path.resolve(process.cwd(), "sanctions_proof.json");
-    const sanctionsPublicPath = path.resolve(process.cwd(), "sanctions_public.json");
+    // This test verifies that nullifiers are rule-specific.
+    // The same proof can be used for different rules because the nullifier
+    // is computed from proof.pi_a + ruleId - changing the ruleId changes the nullifier.
+    //
+    // We generate a fresh sanctions_clear proof at runtime instead of loading
+    // from disk to avoid stale root issues after tree rebuilds.
 
-    const sanctionsProof = JSON.parse(readFileSync(sanctionsProofPath, "utf-8")) as Record<string, unknown>;
-    const sanctionsPublicSignals = JSON.parse(readFileSync(sanctionsPublicPath, "utf-8")) as (string | number)[];
+    // @ts-ignore
+    const { buildPoseidon } = await import("circomlibjs");
+    const { groth16 } = await import("snarkjs");
+
+    const DEPTH_LOCAL = 10;
+    const TREE_SIZE_LOCAL = Math.pow(2, 10);
+
+    const SEED = [
+      "18587147201541259002125695546381675692640309638765950598836980321625257723989",
+      "17407676228024588307375060494808185668377214548579009094260483029038054423873",
+      "1187906673085794891670707751574866400294315419428145822331767160637069288498",
+      "9844570690977637410090429453924380345647745497394079884282770716521743941451",
+      "14978421504646112173397466804057908810400829209353607180654878934968571317213"
+    ];
+
+    // Build tree
+    const poseidon = await buildPoseidon();
+    const F = poseidon.F;
+    const tree: bigint[] = new Array(2 * TREE_SIZE_LOCAL).fill(BigInt(0));
+
+    for (let i = 0; i < SEED.length; i++) {
+      tree[TREE_SIZE_LOCAL + i] = BigInt(SEED[i]);
+    }
+    for (let i = TREE_SIZE_LOCAL - 1; i >= 1; i--) {
+      const hash = poseidon([tree[2 * i], tree[2 * i + 1]]);
+      tree[i] = BigInt(F.toString(hash));
+    }
+
+    const root = tree[1].toString();
+    const pathElements: string[] = [];
+    const pathIndices: number[] = [];
+    let currentIndex = TREE_SIZE_LOCAL; // leaf index 0
+
+    for (let level = 0; level < DEPTH_LOCAL; level++) {
+      const isRight = currentIndex % 2 === 1;
+      pathElements.push(tree[isRight ? currentIndex - 1 : currentIndex + 1].toString());
+      pathIndices.push(isRight ? 1 : 0);
+      currentIndex = Math.floor(currentIndex / 2);
+    }
+
+    const inputs = {
+      identity_secret: "1234567890",
+      pathElements,
+      pathIndices,
+      root,
+      identityCommitment: SEED[0]
+    };
+
+    const wasmPath = path.resolve(
+      process.cwd(),
+      "circuits/sanctions_clear_js/sanctions_clear.wasm"
+    );
+    const zkeyPath = path.resolve(
+      process.cwd(),
+      "sanctions_clear_0.zkey"
+    );
+
+    const { proof: sanctionsProof, publicSignals: sanctionsPublicSignals } =
+      await groth16.fullProve(inputs, wasmPath, zkeyPath);
 
     // First submission with sanctions_clear rule
     const response1 = await request(app)
@@ -201,15 +258,17 @@ describe("Nullifier Registry — Real ZK Replay Prevention", () => {
     expect(response1.status).toBe(200);
     expect(response1.body).toEqual({ compliant: true });
 
-    // Compute nullifiers for both rules
-    const nullifier1 = computeNullifier(sanctionsProof, "sanctions_clear");
-    
-    // Verify the nullifier is registered
+    // Verify nullifier is stored
+    const nullifier1 = computeNullifier(
+      sanctionsProof as unknown as Record<string, unknown>,
+      "sanctions_clear"
+    );
+
     const checkResponse = await request(app)
       .get(`/compliance/nullifier/${nullifier1}`)
       .set("x-api-key", API_KEY);
 
     expect(checkResponse.status).toBe(200);
     expect(checkResponse.body).toEqual({ used: true });
-  }, 30000); // 30 second timeout for real cryptographic verification
+  }, 90000); // 90s timeout - proof generation is slow
 });

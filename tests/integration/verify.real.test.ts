@@ -43,6 +43,7 @@ describe("POST /verify — real ZK verification", () => {
       .post("/verify")
       .set("x-api-key", API_KEY)
       .send({
+        ruleId: "age_18",
         proof: realProof,
         publicSignals: realPublicSignals
       });
@@ -66,6 +67,7 @@ describe("POST /verify — real ZK verification", () => {
       .post("/verify")
       .set("x-api-key", API_KEY)
       .send({
+        ruleId: "age_18",
         proof: tamperedProof,
         publicSignals: realPublicSignals
       });
@@ -88,6 +90,7 @@ describe("POST /verify — real ZK verification", () => {
       .post("/verify")
       .set("x-api-key", "wrong-key")
       .send({
+        ruleId: "age_18",
         proof: realProof,
         publicSignals: realPublicSignals
       });
