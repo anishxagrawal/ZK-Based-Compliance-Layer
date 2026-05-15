@@ -2,11 +2,11 @@
   "name": "zk-project",
   "version": "1.0.0",
   "description": "ZK-based compliance layer using Node.js, TypeScript, Express, circom, and snarkjs.",
-  "main": "dist/api/app.js",
+  "main": "dist/src/api/app.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "NODE_ENV=development ts-node-dev --respawn --transpile-only src/api/app.ts",
-    "start": "node dist/api/app.js",
+    "start": "node dist/src/api/app.js",
     "test": "jest --runInBand",
     "compile:circuit": "bash scripts/compile_circuit.sh"
   },

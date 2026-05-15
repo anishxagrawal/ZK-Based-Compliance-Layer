@@ -70,7 +70,7 @@ const complianceService = new ComplianceService(verifier, nullifierRegistry);
 const proofGenerationService = new ProofGenerationService(generator);
 
 // Initialize Merkle tree for sanctions_clear circuit
-const merkleTreeService = new MerkleTreeService();
+const merkleTreeService = new MerkleTreeService(redis);
 merkleTreeService.initialize().catch((err) => {
   // eslint-disable-next-line no-console
   console.error("[MerkleTree] Failed to initialize:", err);

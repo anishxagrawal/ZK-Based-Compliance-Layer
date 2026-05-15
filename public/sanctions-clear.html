@@ -26,6 +26,23 @@
 </head>
 <body>
 
+<!-- REGISTRATION SECTION -->
+<div id="registration-section" style="border: 1px solid #ccc; padding: 16px; margin-bottom: 32px; background: #f9f9f9;">
+  <h2 style="margin-top: 0; border: none;">Register Your Identity (New Users)</h2>
+  <p class="info">
+    Already registered? Skip this and go to Step 1 below.<br/>
+    Your identity_secret never leaves your browser -- only its hash is sent to the server.
+  </p>
+
+  <label>Identity Secret (private -- choose any number, remember it):</label>
+  <input id="reg-secret" type="text" placeholder="e.g. 9999999999" />
+
+  <button onclick="registerIdentity()" style="margin-top: 8px;">Register Identity</button>
+
+  <p id="reg-status" style="margin-top: 8px;"></p>
+  <pre id="reg-result" style="display:none; background:#eee; padding:8px; font-size:12px;"></pre>
+</div>
+
 <h1>Sanctions Clear</h1>
 <p>
   Proves your identity is on the approved whitelist without revealing
@@ -73,6 +90,67 @@
 <script>
   let commitmentValue = null;
   let pathData = null;
+
+  /**
+   * Registration flow:
+   * 1. Compute commitment = Poseidon(secret) locally
+   * 2. POST { identityCommitment } to /sanctions/register
+   * 3. Display new root and success message
+   *
+   * The secret is used only in step 1 and never transmitted.
+   */
+  async function registerIdentity() {
+    const regStatus = document.getElementById("reg-status");
+    const regResult = document.getElementById("reg-result");
+
+    const secret = document.getElementById("reg-secret").value.trim();
+    if (!secret) {
+      regStatus.textContent = "Please enter an identity secret.";
+      return;
+    }
+
+    regStatus.textContent = "Computing commitment locally...";
+
+    try {
+      await window._poseidonReady;
+      const hash = window._poseidon([BigInt(secret)]);
+      const commitment = window._poseidon.F.toString(hash);
+
+      console.log("[register] Commitment computed:", commitment);
+
+      regStatus.textContent = "Sending commitment to server...";
+
+      const res = await fetch("/sanctions/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": window.zkClient._API_KEY
+        },
+        body: JSON.stringify({ identityCommitment: commitment })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        regStatus.textContent = "Registration failed: " + (data.message || data.error);
+        return;
+      }
+
+      regStatus.textContent =
+        "Registered. You can now generate a proof. New tree root: " + data.root.slice(0, 20) + "...";
+
+      regResult.style.display = "block";
+      regResult.textContent = JSON.stringify(data, null, 2);
+
+      const step1SecretField = document.getElementById("secret");
+      if (step1SecretField) {
+        step1SecretField.value = secret;
+      }
+    } catch (err) {
+      regStatus.textContent = "Error: " + err.message;
+      console.error(err);
+    }
+  }
 
   async function computeCommitment() {
     try {
