@@ -45,6 +45,11 @@
     }
 
     async function run() {
+      if (!window.snarkjs) {
+        document.getElementById("status").textContent =
+          "Error: ZK library still loading, please wait a moment and try again.";
+        return;
+      }
       const status = document.getElementById("status");
       status.textContent = "Generating proof...";
       try {
