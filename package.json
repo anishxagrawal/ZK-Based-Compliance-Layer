@@ -5,7 +5,7 @@
   "main": "dist/api/app.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "dev": "ts-node-dev --respawn --transpile-only src/api/app.ts",
+    "dev": "NODE_ENV=development ts-node-dev --respawn --transpile-only src/api/app.ts",
     "start": "node dist/api/app.js",
     "test": "jest --runInBand",
     "compile:circuit": "bash scripts/compile_circuit.sh"

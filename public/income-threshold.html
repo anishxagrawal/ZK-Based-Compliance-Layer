@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Income Threshold - ZK Proof</title>
+  <script src="https://cdn.jsdelivr.net/npm/snarkjs@0.7.4/build/snarkjs.min.js"></script>
+  <script src="/zk-client.js"></script>
+  <script type="module">
+    import { buildPoseidon } from "https://esm.sh/circomlibjs@0.1.7";
+    window._poseidonReady = buildPoseidon().then((p) => { window._poseidon = p; });
+  </script>
+</head>
+<body>
+  <h1>Income Threshold</h1>
+  <p>Proves your income is above a threshold without revealing it.</p>
+
+  <h2>Step 1 - Compute your commitment (do this once)</h2>
+  <label>Your income (private):</label><br />
+  <input id="income" type="number" value="60000" /><br /><br />
+  <label>Blinding factor (private - pick any large random number):</label><br />
+  <input id="blind" type="number" value="987654321" /><br /><br />
+  <button onclick="computeCommitment()">Compute Commitment</button>
+  <p>Your commitment (public - share this with the server):</p>
+  <input id="commitment-display" readonly style="width: 100%" />
+
+  <h2>Step 2 - Generate and submit proof</h2>
+  <label>Threshold (public - what the server requires):</label><br />
+  <input id="threshold" type="number" value="50000" /><br /><br />
+  <label>Commitment (paste from Step 1 or from server):</label><br />
+  <input id="commitment" style="width: 100%" /><br /><br />
+  <button onclick="run()">Prove &amp; Submit</button>
+
+  <p id="status"></p>
+  <pre id="result"></pre>
+
+  <script>
+    async function computeCommitment() {
+      await window._poseidonReady;
+      const income = document.getElementById("income").value;
+      const blind = document.getElementById("blind").value;
+      const hash = window._poseidon([BigInt(income), BigInt(blind)]);
+      const str = window._poseidon.F.toString(hash);
+      document.getElementById("commitment-display").value = str;
+      document.getElementById("commitment").value = str;
+    }
+
+    async function run() {
+      const status = document.getElementById("status");
+      status.textContent = "Generating proof...";
+      try {
+        const allInputs = {
+          income: document.getElementById("income").value,
+          blinding_factor: document.getElementById("blind").value,
+          threshold: document.getElementById("threshold").value,
+          commitment: document.getElementById("commitment").value
+        };
+
+        const { proof, publicSignals } = await window.zkClient.generateProof(
+          "income_threshold",
+          allInputs
+        );
+        status.textContent = "Submitting...";
+        const response = await window.zkClient.submitCompliance(
+          "income_threshold",
+          proof,
+          publicSignals
+        );
+        status.textContent = response.compliant ? "OK: Compliant" : "Not compliant";
+        document.getElementById("result").textContent = JSON.stringify(
+          { publicSignals, response },
+          null,
+          2
+        );
+      } catch (err) {
+        status.textContent = "Error: " + err.message;
+        console.error(err);
+      }
+    }
+  </script>
+</body>
+</html>

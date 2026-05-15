@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sanctions Clear - ZK Proof</title>
+  <script src="https://cdn.jsdelivr.net/npm/snarkjs@0.7.4/build/snarkjs.min.js"></script>
+  <script src="/zk-client.js"></script>
+  <script src="/js/circomlibjs.bundle.js"></script>
+  <script>
+  window._poseidonReady = circomlibjs.buildPoseidon().then((p) => {
+    window._poseidon = p;
+    console.log("[sanctions] Poseidon hasher ready");
+  });
+  </script>
+  <style>
+    body { font-family: monospace; max-width: 680px; margin: 40px auto; padding: 0 16px; }
+    h2 { margin-top: 2rem; border-top: 1px solid #ddd; padding-top: 1rem; }
+    label { display: block; margin: 8px 0 4px; font-weight: bold; }
+    input { width: 100%; padding: 6px; box-sizing: border-box; font-family: monospace; }
+    button { margin-top: 8px; padding: 8px 20px; cursor: pointer; font-size: 14px; }
+    pre { background: #f4f4f4; padding: 12px; overflow-x: auto; white-space: pre-wrap; font-size: 12px; }
+    .ok { color: green; font-weight: bold; font-size: 18px; }
+    .fail { color: red; font-weight: bold; font-size: 18px; }
+    .info { color: #555; font-size: 13px; margin: 4px 0; }
+  </style>
+</head>
+<body>
+
+<h1>Sanctions Clear</h1>
+<p>
+  Proves your identity is on the approved whitelist without revealing
+  which identity you are or what your secret is.
+</p>
+
+<h2>Step 1 - Compute Your Identity Commitment</h2>
+<p class="info">
+  Your identity_secret stays in your browser. Only the commitment
+  (a hash of the secret) is sent to the server.
+</p>
+
+<label>Identity Secret (private - never leaves your browser):</label>
+<input id="secret" type="text" value="1234567890" />
+<p class="info">Use one of the test secrets from generate-test-identities.ts</p>
+
+<button onclick="computeCommitment()">Compute Commitment</button>
+
+<label style="margin-top:12px">Your Identity Commitment (public - Poseidon of your secret):</label>
+<input id="commitment-display" readonly />
+
+<h2>Step 2 - Fetch Your Merkle Path</h2>
+<p class="info">
+  The server looks up your commitment in its whitelist and returns
+  the sibling hashes needed to prove membership.
+  It does NOT learn your secret.
+</p>
+
+<button onclick="fetchPath()">Fetch Path From Server</button>
+
+<label style="margin-top:12px">Server Response:</label>
+<pre id="path-display">-</pre>
+
+<h2>Step 3 - Generate Proof and Submit</h2>
+<p class="info">
+  Proof is generated entirely in your browser using the secret and path.
+  Only the proof and public signals are sent to the server.
+</p>
+
+<button onclick="runProof()">Generate Proof &amp; Submit</button>
+
+<p id="status"></p>
+<pre id="result">-</pre>
+
+<script>
+  let commitmentValue = null;
+  let pathData = null;
+
+  async function computeCommitment() {
+    try {
+      await window._poseidonReady;
+
+      const secret = document.getElementById("secret").value.trim();
+      if (!secret) {
+        alert("Please enter an identity secret.");
+        return;
+      }
+
+      const hash = window._poseidon([BigInt(secret)]);
+      const commitment = window._poseidon.F.toString(hash);
+
+      commitmentValue = commitment;
+      document.getElementById("commitment-display").value = commitment;
+      console.log("[sanctions] Commitment computed:", commitment);
+    } catch (err) {
+      alert("Error computing commitment: " + err.message);
+      console.error(err);
+    }
+  }
+
+  async function fetchPath() {
+    if (!commitmentValue) {
+      alert("Compute your commitment first (Step 1).");
+      return;
+    }
+
+    const display = document.getElementById("path-display");
+    display.textContent = "Fetching from server...";
+
+    try {
+      const res = await fetch(`/sanctions/path/${commitmentValue}`, {
+        headers: { "x-api-key": window.zkClient._API_KEY }
+      });
+
+      if (res.status === 404) {
+        display.textContent = "ERROR: Identity not found in whitelist.\nMake sure you used a secret from generate-test-identities.ts and the commitments are hardcoded in MerkleTreeService.ts";
+        return;
+      }
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        display.textContent = "ERROR: " + (body.error || `HTTP ${res.status}`);
+        return;
+      }
+
+      pathData = await res.json();
+      display.textContent = JSON.stringify(pathData, null, 2);
+      console.log("[sanctions] Path received:", pathData);
+    } catch (err) {
+      display.textContent = "Network error: " + err.message;
+      console.error(err);
+    }
+  }
+
+  async function runProof() {
+    const status = document.getElementById("status");
+    const result = document.getElementById("result");
+
+    if (!commitmentValue || !pathData) {
+      alert("Complete Steps 1 and 2 first.");
+      return;
+    }
+
+    status.textContent = "Generating proof locally (this may take 1-3 seconds)...";
+    result.textContent = "";
+
+    try {
+      const secret = document.getElementById("secret").value.trim();
+
+      const allInputs = {
+        identity_secret: secret,
+        pathElements: pathData.pathElements,
+        pathIndices: pathData.pathIndices,
+        root: pathData.root,
+        identityCommitment: commitmentValue
+      };
+
+      const { proof, publicSignals } = await window.zkClient.generateProof(
+        "sanctions_clear",
+        allInputs
+      );
+
+      status.textContent = "Submitting proof to server...";
+
+      const response = await window.zkClient.submitCompliance(
+        "sanctions_clear",
+        proof,
+        publicSignals
+      );
+
+      status.className = response.compliant ? "ok" : "fail";
+      status.textContent = response.compliant
+        ? "OK: Compliant - Identity is on the whitelist"
+        : "Not compliant";
+
+      result.textContent = JSON.stringify(
+        {
+          publicSignals,
+          note: "identity_secret is not in this payload",
+          response
+        },
+        null,
+        2
+      );
+    } catch (err) {
+      status.className = "fail";
+      status.textContent = "Error: " + err.message;
+      console.error(err);
+    }
+  }
+</script>
+
+</body>
+</html>

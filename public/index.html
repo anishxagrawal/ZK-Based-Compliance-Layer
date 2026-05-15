@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZK Compliance System</title>
+  <style>
+    /* -- Reset & Base ------------------------------------------- */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0a0a0f;
+      --surface:   #111118;
+      --border:    #1e1e2e;
+      --accent:    #00ff88;
+      --accent-dim:#00cc6a;
+      --text:      #e2e2e8;
+      --muted:     #6b6b80;
+      --red:       #ff4466;
+      --yellow:    #ffcc00;
+      --blue:      #4488ff;
+      --radius:    6px;
+      --mono:      'Courier New', Courier, monospace;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 14px;
+      line-height: 1.7;
+      min-height: 100vh;
+    }
+
+    /* -- Layout ------------------------------------------------- */
+    .page {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 60px 24px 80px;
+    }
+
+    /* -- Header ------------------------------------------------- */
+    .header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 40px;
+      margin-bottom: 48px;
+    }
+
+    .header-tag {
+      color: var(--accent);
+      font-size: 11px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    .header h1 {
+      font-size: clamp(28px, 5vw, 48px);
+      font-weight: normal;
+      letter-spacing: -1px;
+      color: #fff;
+      line-height: 1.1;
+      margin-bottom: 20px;
+    }
+
+    .header h1 span {
+      color: var(--accent);
+    }
+
+    .header p {
+      color: var(--muted);
+      max-width: 560px;
+      font-size: 13px;
+      line-height: 1.8;
+    }
+
+    /* -- Status Bar --------------------------------------------- */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 12px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 48px;
+      flex-wrap: wrap;
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+      flex-shrink: 0;
+    }
+
+    .dot.green  { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+    .dot.red    { background: var(--red);    box-shadow: 0 0 6px var(--red); }
+    .dot.yellow { background: var(--yellow); }
+
+    .status-label { color: var(--text); }
+
+    /* -- Section headers ---------------------------------------- */
+    .section-title {
+      font-size: 11px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    /* -- Circuit Cards ------------------------------------------ */
+    .circuits {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+      margin-bottom: 48px;
+    }
+
+    .card {
+      display: block;
+      text-decoration: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      transition: border-color 0.15s, transform 0.15s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: var(--card-color, var(--accent));
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    .card:hover {
+      border-color: var(--card-color, var(--accent));
+      transform: translateY(-2px);
+    }
+
+    .card:hover::before { opacity: 1; }
+
+    .card-number {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 12px;
+      letter-spacing: 1px;
+    }
+
+    .card h2 {
+      font-size: 16px;
+      font-weight: normal;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+
+    .card-desc {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+
+    .card-inputs {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 16px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 8px;
+      font-size: 11px;
+    }
+
+    .input-badge {
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-size: 10px;
+      letter-spacing: 0.5px;
+      flex-shrink: 0;
+    }
+
+    .private {
+      background: rgba(255, 68, 102, 0.15);
+      color: var(--red);
+      border: 1px solid rgba(255, 68, 102, 0.3);
+    }
+
+    .public {
+      background: rgba(68, 136, 255, 0.15);
+      color: var(--blue);
+      border: 1px solid rgba(68, 136, 255, 0.3);
+    }
+
+    .input-name { color: var(--muted); }
+
+    .card-link {
+      font-size: 12px;
+      color: var(--card-color, var(--accent));
+      letter-spacing: 1px;
+    }
+
+    /* -- How It Works ------------------------------------------- */
+    .flow {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 48px;
+    }
+
+    .flow-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .flow-step {
+      display: flex;
+      gap: 16px;
+      position: relative;
+    }
+
+    .flow-step:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      left: 15px;
+      top: 32px;
+      bottom: 0;
+      width: 1px;
+      background: var(--border);
+    }
+
+    .step-num {
+      width: 32px;
+      height: 32px;
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: var(--accent);
+      flex-shrink: 0;
+      background: var(--bg);
+      position: relative;
+      z-index: 1;
+    }
+
+    .step-content {
+      padding: 6px 0 24px;
+    }
+
+    .step-content strong {
+      display: block;
+      color: #fff;
+      margin-bottom: 2px;
+      font-size: 13px;
+    }
+
+    .step-content span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    /* -- Links Row ---------------------------------------------- */
+    .links {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 48px;
+    }
+
+    .link-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      text-decoration: none;
+      color: var(--muted);
+      font-size: 12px;
+      transition: color 0.15s, border-color 0.15s;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .link-item:hover {
+      color: var(--text);
+      border-color: var(--muted);
+    }
+
+    .link-icon { font-size: 14px; }
+
+    #resource-output {
+      display: none;
+      margin-bottom: 48px;
+      padding: 16px;
+      background: #0f0f16;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    /* -- Footer ------------------------------------------------- */
+    .footer {
+      border-top: 1px solid var(--border);
+      padding-top: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .footer-left {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .footer-right {
+      display: flex;
+      gap: 16px;
+    }
+
+    .tech-badge {
+      font-size: 10px;
+      padding: 2px 8px;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+    }
+
+    /* -- Animations --------------------------------------------- */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .header  { animation: fadeUp 0.4s ease both; }
+    .status-bar { animation: fadeUp 0.4s ease 0.1s both; }
+    .circuits { animation: fadeUp 0.4s ease 0.2s both; }
+    .flow    { animation: fadeUp 0.4s ease 0.3s both; }
+    .links   { animation: fadeUp 0.4s ease 0.4s both; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-tag">Zero-Knowledge Compliance System</div>
+    <h1>Prove it.<br/><span>Without revealing it.</span></h1>
+    <p>
+      A privacy-preserving compliance API using Groth16 ZK proofs.
+      Private inputs -- age, income, identity -- never leave your browser.
+      Only the cryptographic proof is sent to the server.
+    </p>
+  </header>
+
+  <!-- Live Status -->
+  <div class="status-bar" id="statusBar">
+    <div class="status-item">
+      <div class="dot yellow" id="apiDot"></div>
+      <span class="status-label" id="apiStatus">Checking API...</span>
+    </div>
+    <div class="status-item">
+      <div class="dot yellow" id="redisDot"></div>
+      <span class="status-label" id="redisStatus">Checking Redis...</span>
+    </div>
+    <div class="status-item">
+      <div class="dot green"></div>
+      <span class="status-label">3 circuits active</span>
+    </div>
+  </div>
+
+  <!-- Circuit Cards -->
+  <div class="section-title">Demo Circuits</div>
+  <div class="circuits">
+
+    <a class="card" href="/age-check.html" style="--card-color: #00ff88">
+      <div class="card-number">Circuit 01</div>
+      <h2>Age Verification</h2>
+      <p class="card-desc">
+        Prove you meet a minimum age threshold without revealing your actual age.
+      </p>
+      <div class="card-inputs">
+        <div class="input-row">
+          <span class="input-badge private">private</span>
+          <span class="input-name">age</span>
+        </div>
+        <div class="input-row">
+          <span class="input-badge public">public</span>
+          <span class="input-name">threshold</span>
+        </div>
+      </div>
+      <div class="card-link">Open demo -></div>
+    </a>
+
+    <a class="card" href="/income-threshold.html" style="--card-color: #4488ff">
+      <div class="card-number">Circuit 02</div>
+      <h2>Income Threshold</h2>
+      <p class="card-desc">
+        Prove your income exceeds a threshold using a Poseidon commitment. Income stays private.
+      </p>
+      <div class="card-inputs">
+        <div class="input-row">
+          <span class="input-badge private">private</span>
+          <span class="input-name">income, blinding_factor</span>
+        </div>
+        <div class="input-row">
+          <span class="input-badge public">public</span>
+          <span class="input-name">threshold, commitment</span>
+        </div>
+      </div>
+      <div class="card-link">Open demo -></div>
+    </a>
+
+    <a class="card" href="/sanctions-clear.html" style="--card-color: #ff4466">
+      <div class="card-number">Circuit 03</div>
+      <h2>Sanctions Clear</h2>
+      <p class="card-desc">
+        Prove your identity is on an approved whitelist using a 10-level Poseidon Merkle tree.
+      </p>
+      <div class="card-inputs">
+        <div class="input-row">
+          <span class="input-badge private">private</span>
+          <span class="input-name">identity_secret, path</span>
+        </div>
+        <div class="input-row">
+          <span class="input-badge public">public</span>
+          <span class="input-name">root, commitment</span>
+        </div>
+      </div>
+      <div class="card-link">Open demo -></div>
+    </a>
+
+  </div>
+
+  <!-- How It Works -->
+  <div class="section-title">How It Works</div>
+  <div class="flow">
+    <div class="flow-steps">
+      <div class="flow-step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <strong>Enter private inputs in the browser</strong>
+          <span>Age, income, or identity secret -- typed locally, never transmitted</span>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <strong>Circuit files fetched from server</strong>
+          <span>WASM and zkey files downloaded once, cached permanently in browser</span>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <strong>Proof generated locally via snarkjs</strong>
+          <span>Groth16 fullProve() runs in browser Web Workers -- private inputs used here only</span>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <strong>Only proof + public signals sent to server</strong>
+          <span>POST /compliance/check -- no private data in the request</span>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <strong>Server verifies cryptographically</strong>
+          <span>groth16.verify() checks the proof against the circuit's verification key</span>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">6</div>
+        <div class="step-content">
+          <strong>Nullifier stored in Redis</strong>
+          <span>Proof hash recorded -- same proof can never be replayed</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Utility Links -->
+  <div class="section-title">Resources</div>
+  <div class="links">
+    <button class="link-item" type="button" data-endpoint="/health" data-label="Health Check">
+      <span class="link-icon">Health</span> Health Check
+    </button>
+    <button class="link-item" type="button" data-endpoint="/docs" data-label="OpenAPI Docs">
+      <span class="link-icon">API</span> OpenAPI Docs
+    </button>
+    <button class="link-item" type="button" data-endpoint="/sanctions/root" data-label="Sanctions Root">
+      <span class="link-icon">Root</span> Sanctions Root
+    </button>
+  </div>
+
+  <pre id="resource-output"></pre>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-left">
+      ZK Compliance System -- Groth16 · circom 2.1.6 · snarkjs
+    </div>
+    <div class="footer-right">
+      <span class="tech-badge">TypeScript</span>
+      <span class="tech-badge">Express</span>
+      <span class="tech-badge">Redis</span>
+      <span class="tech-badge">snarkjs</span>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+  // Fetch live system status from /health
+  // The health endpoint requires the API key header
+  const API_KEY = "f9957b09e07300463be8c34bf6864be717f82cc86271b9013c3db5f960871f1e";
+
+  async function checkHealth() {
+    try {
+      const res = await fetch("/health", {
+        headers: { "x-api-key": API_KEY }
+      });
+
+      if (!res.ok) throw new Error("HTTP " + res.status);
+
+      const data = await res.json();
+
+      // API status
+      document.getElementById("apiDot").className    = "dot green";
+      document.getElementById("apiStatus").textContent = "API online";
+
+      // Redis status
+      const redisDot    = document.getElementById("redisDot");
+      const redisStatus = document.getElementById("redisStatus");
+
+      if (data.redis === "connected") {
+        redisDot.className      = "dot green";
+        redisStatus.textContent = "Redis connected";
+      } else {
+        redisDot.className      = "dot red";
+        redisStatus.textContent = "Redis disconnected";
+      }
+
+    } catch (err) {
+      document.getElementById("apiDot").className    = "dot red";
+      document.getElementById("apiStatus").textContent = "API offline";
+      document.getElementById("redisDot").className  = "dot red";
+      document.getElementById("redisStatus").textContent = "Redis unknown";
+    }
+  }
+
+  async function fetchWithKey(endpoint, label) {
+    const res = await fetch(endpoint, {
+      headers: { "x-api-key": API_KEY }
+    });
+
+    const bodyText = await res.text();
+    let output = bodyText;
+
+    try {
+      output = JSON.stringify(JSON.parse(bodyText), null, 2);
+    } catch {
+      // Keep text as-is when not JSON.
+    }
+
+    const resourceOutput = document.getElementById("resource-output");
+    resourceOutput.textContent = "Endpoint: " + endpoint + " (" + res.status + ")\n\n" + output;
+    resourceOutput.style.display = "block";
+  }
+
+  // Run on load
+  checkHealth();
+
+  // Refresh every 30 seconds
+  setInterval(checkHealth, 30000);
+
+  // Resource buttons fetch with API key header
+  const resourceButtons = document.querySelectorAll("[data-endpoint]");
+  resourceButtons.forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const endpoint = btn.getAttribute("data-endpoint");
+      const label = btn.getAttribute("data-label") || endpoint;
+      if (!endpoint) return;
+
+      try {
+        await fetchWithKey(endpoint, label);
+      } catch (err) {
+        const resourceOutput = document.getElementById("resource-output");
+        resourceOutput.textContent = "Endpoint: " + endpoint + "\n\nError: " + String(err);
+        resourceOutput.style.display = "block";
+      }
+    });
+  });
+</script>
+
+</body>
+</html>

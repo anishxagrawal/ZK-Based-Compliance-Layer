@@ -11,6 +11,7 @@ import path from "path";
 import yaml from "js-yaml";
 
 import { ComplianceService } from "../services/ComplianceService";
+import { MerkleTreeService } from "../services/MerkleTreeService";
 import { ProofGenerationService } from "../services/ProofGenerationService";
 // import { InMemoryNullifierRegistry } from "../zk/implementations/InMemoryNullifierRegistry";
 import { RedisNullifierRegistry } from "../zk/implementations/RedisNullifierRegistry";
@@ -20,6 +21,7 @@ import { authMiddleware } from "./middleware/auth";
 import { apiRateLimiter } from "./middleware/rateLimiter";
 import { createComplianceRouter } from "./routes/compliance";
 import { createProofGenerateRouter } from "./routes/proofGenerate";
+import { createSanctionsRouter } from "./routes/sanctions";
 import { createVerifyRouter } from "./routes/verify";
 
 dotenv.config();
@@ -67,14 +69,56 @@ const nullifierRegistry = new RedisNullifierRegistry(redis);
 const complianceService = new ComplianceService(verifier, nullifierRegistry);
 const proofGenerationService = new ProofGenerationService(generator);
 
+// Initialize Merkle tree for sanctions_clear circuit
+const merkleTreeService = new MerkleTreeService();
+merkleTreeService.initialize().catch((err) => {
+  // eslint-disable-next-line no-console
+  console.error("[MerkleTree] Failed to initialize:", err);
+  process.exit(1);
+});
+
 export const app = express();
 app.use(express.json());
+
+// Serve circuit WASM files
+app.use(
+  "/circuits",
+  express.static(path.resolve(process.cwd(), "circuits"), {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith(".wasm")) {
+        res.setHeader("Content-Type", "application/wasm");
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      }
+    }
+  })
+);
+
+// Serve zkey files from project root
+app.use(
+  "/zkeys",
+  express.static(path.resolve(process.cwd()), {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith(".zkey")) {
+        res.setHeader("Content-Type", "application/octet-stream");
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      }
+    }
+  })
+);
+
+// Serve browser client assets
+app.use(express.static(path.resolve(process.cwd(), "public")));
+
 app.use(apiRateLimiter);
 app.use(authMiddleware);
 
 app.use("/verify", createVerifyRouter(verifier));
 app.use("/compliance", createComplianceRouter(complianceService, nullifierRegistry));
-app.use("/proof/generate", createProofGenerateRouter(proofGenerationService));
+if (process.env.NODE_ENV === "development") {
+  app.use("/proof/generate", createProofGenerateRouter(proofGenerationService));
+  console.log("[DEV] /proof/generate mounted — development only");
+}
+app.use("/sanctions", createSanctionsRouter(merkleTreeService));
 
 app.get("/health", async (_req, res) => {
   // Check Redis connectivity using duck typing
